@@ -1,13 +1,15 @@
 package wiki.sogou.mockito;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 
@@ -251,7 +253,7 @@ class MockitoTest {
 
 
         when(mock.get("some arg"))
-                .thenReturn ("one", "two", "three");
+                .thenReturn("one", "two", "three");
 
         //All mock.someMethod("some arg") calls will return "two"
         when(mock.get("some arg"))
@@ -262,7 +264,105 @@ class MockitoTest {
     }
 
 
+    @Test
     public void testCallback() {
+        Map<String, String> mock = mock(Map.class);
+        when(mock.get(anyString())).thenAnswer(
+                new Answer() {
+                    public Object answer(InvocationOnMock invocation) {
+                        Object[] args = invocation.getArguments();
+                        Object mock = invocation.getMock();
+                        return "called with arguments: " + Arrays.toString(args);
+                    }
+                });
 
+        //Following prints "called with arguments: [foo]"
+        System.out.println(mock.get("foo"));
+    }
+
+    @Test
+    public void testFamilyMethods() {
+        List<String> mockedList = mock(List.class);
+        doThrow(new RuntimeException()).when(mockedList).clear();
+
+        //following throws RuntimeException:
+        mockedList.clear();
+
+    }
+
+    /**
+     * 你可以创建真实对象的间谍，当你使用spy的时候，真实的方法会被调用，除非那个方法被打桩了
+     */
+    @Test
+    public void testSpy() {
+
+        List list = new LinkedList();
+        List spy = spy(list);
+
+        //optionally, you can stub out some methods:
+        when(spy.size()).thenReturn(100);
+
+        //using the spy calls *real* methods
+        spy.add("one");
+        spy.add("two");
+
+        //prints "one" - the first element of a list
+        System.out.println(spy.get(0));
+
+        //size() method was stubbed - 100 is printed
+        System.out.println(spy.size());
+
+        //optionally, you can verify
+        verify(spy).add("one");
+        verify(spy).add("two");
+    }
+
+    @Test
+    public void testSpy2() {
+        List list = new LinkedList();
+        List spy = spy(list);
+
+        //Impossible: real method is called so spy.get(0) throws IndexOutOfBoundsException (the list is yet empty)
+        when(spy.get(0)).thenReturn("foo");
+
+        //You have to use doReturn() for stubbing
+        doReturn("foo").when(spy).get(0);
+    }
+
+    @Test
+    public void testWithLegacySystems() {
+        List mock = mock(List.class, RETURNS_SMART_NULLS);
+        List mockTwo = mock(List.class, (a) -> new ArrayList<>());
+    }
+
+    @Test
+    public void testCaptureArgument() {
+        List mock = mock(List.class, RETURNS_SMART_NULLS);
+        ArgumentCaptor<List> argument = ArgumentCaptor.forClass(List.class);
+//        verify(mock).get(argument.capture());
+//        assertEquals("John", argument.getValue().getName());
+    }
+
+    @Test
+    public void testRealPartialMock() {
+        //you can create partial mock with spy() method:
+        List list = spy(new LinkedList());
+
+        //you can enable partial mock capabilities selectively on mocks:
+        List mock = mock(List.class);
+        //Be sure the real implementation is 'safe'.
+        //If real implementation throws exceptions or depends on specific state of the object then you're in trouble.
+        when(mock.get(anyInt())).thenCallRealMethod();
+
+    }
+
+    @Test
+    public void testResettingMock() {
+        List mock = mock(List.class);
+        when(mock.size()).thenReturn(10);
+        mock.add(1);
+
+        reset(mock);
+        //at this point the mock forgot any interactions and stubbing
     }
 }
